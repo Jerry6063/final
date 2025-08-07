@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>NYC Accessible Pedestrian Signals — Reviews</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- App styles -->
+    <link rel="stylesheet" href="./style.css" />
+
+    <!-- Fallback: if external CSS fails, still ensure the map is visible -->
+    <style>#map{position:absolute; inset:0}</style>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar" aria-label="Controls & review form">
+        <div class="aside-header">
+          <h1>NYC APS + Community Reviews</h1>
+          <button id="collapseBtn" title="Collapse">⟨</button>
+        </div>
+
+        <div class="panel stat">
+          <div class="row">
+            <span class="badge" id="countReviews">0</span>
+            <span class="muted">community reviews</span>
+          </div>
+          <div class="small muted">Base map © OSM · APS data: NYC Open Data (de3m-c5p4)</div>
+        </div>
+
+        <!-- Review form in the sidebar -->
+        <div class="panel">
+          <h2 class="panel-title">Add Accessible Facility Review</h2>
+
+          <div class="hint small muted">Pick a location first (map click or current center).</div>
+
+          <div class="row">
+            <button type="button" id="useMapClick">Use next map click</button>
+            <button type="button" id="useCenter">Use map center</button>
+          </div>
+          <div id="chosenLatLng" class="small muted" style="min-height:20px"></div>
+
+          <label class="label">Address (optional)
+            <input type="text" id="address" placeholder="e.g., W 110th St & Broadway" />
+          </label>
+
+          <label class="label">Facility type
+            <select id="facilityType">
+              <option value="Accessible Pedestrian Signal (APS)">Accessible Pedestrian Signal (APS)</option>
+              <option value="Tactile paving / guidance">Tactile paving / guidance</option>
+              <option value="Curb ramp">Curb ramp</option>
+              <option value="Transit stop / station">Transit stop / station</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+
+          <fieldset class="group">
+            <legend class="label">Rating</legend>
+            <label class="chip"><input type="radio" name="rating" value="up" checked /> 👍 Works well</label>
+            <label class="chip"><input type="radio" name="rating" value="down" /> 👎 Hard to use</label>
+          </fieldset>
+
+          <label class="label">Tags (multi-select)
+            <div class="chips" id="tagChips">
+              <label class="chip"><input type="checkbox" value="Clear audio cues" />Clear audio cues</label>
+              <label class="chip"><input type="checkbox" value="Strong haptic feedback" />Strong haptic feedback</label>
+              <label class="chip"><input type="checkbox" value="Button reachable" />Button reachable</label>
+              <label class="chip"><input type="checkbox" value="Confusing intersection" />Confusing intersection</label>
+              <label class="chip"><input type="checkbox" value="High traffic noise" />High traffic noise</label>
+              <label class="chip"><input type="checkbox" value="Blocked by construction" />Blocked by construction</label>
+            </div>
+          </label>
+
+          <label class="label">Notes (optional)
+            <textarea id="comment" rows="3" placeholder="Describe your experience…"></textarea>
+          </label>
+
+          <div class="row end">
+            <button id="submitReview">Submit</button>
+          </div>
+        </div>
+
+        <div class="panel legend">
+          <div class="legend-item"><span class="dot aps"></span> APS points (official)</div>
+          <div class="legend-item"><span class="dot good"></span> Community review — good</div>
+          <div class="legend-item"><span class="dot bad"></span> Community review — bad</div>
+        </div>
+      </aside>
+
+      <main>
+        <div id="map" aria-label="Map"></div>
+        <div id="toast" role="status" aria-live="polite"></div>
+      </main>
+    </div>
+
+    <!-- Firebase (compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+    <!-- App logic -->
+    <script src="./main.js"></script>
+  </body>
+</html>
