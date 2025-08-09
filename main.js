@@ -15,7 +15,10 @@ firebase.firestore().enablePersistence().catch(() => { }); // best-effort offlin
 /***** Anonymous auth *****/
 let currentUser = null;
 auth.signInAnonymously().catch(console.error);
-auth.onAuthStateChanged(u => { currentUser = u; });
+auth.onAuthStateChanged(u => {
+  currentUser = u;
+  console.log('[auth] user:', u ? u.uid : null);
+});
 
 /***** Map *****/
 const NYC_CENTER = [40.7128, -74.0060];
@@ -298,57 +301,72 @@ if (submitBtn) {
   });
 }
 
-/***** Export reviews -> GeoJSON *****/
+/***** Export reviews -> GeoJSON (robust) *****/
 function toISO(ts) {
   try { return ts?.toDate?.().toISOString?.() || null; } catch { return null; }
 }
 
-async function exportGeoJSON() {
-  try {
-    // Pull up to 5000 docs; adjust as needed or paginate
-    const snap = await db.collection('reviews').orderBy('createdAt', 'desc').limit(5000).get();
-
-    const features = [];
-    snap.forEach(doc => {
-      const d = doc.data() || {};
-      if (typeof d.lat !== 'number' || typeof d.lng !== 'number') return;
-      features.push({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [d.lng, d.lat] },
-        properties: {
-          id: doc.id,
-          address: d.address || null,
-          facilityType: d.facilityType || null,
-          rating: d.rating || null,
-          tags: Array.isArray(d.tags) ? d.tags : [],
-          comment: d.comment || null,
-          userId: d.userId || null,
-          createdAt: toISO(d.createdAt),
-          updatedAt: toISO(d.updatedAt)
-        }
-      });
+// 绑定导出按钮 + 诊断日志
+const exportBtn = document.getElementById('exportGeoJSON');
+if (!exportBtn) {
+  console.warn('Export button not found in DOM.');
+} else {
+  exportBtn.addEventListener('click', () => {
+    console.log('[export] clicked');
+    exportGeoJSON().catch(e => {
+      console.error('[export] failed:', e);
+      alert('Export failed: ' + (e?.message || e));
     });
-
-    const fc = { type: 'FeatureCollection', features };
-    const blob = new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' });
-
-    const stamp = new Date().toISOString().slice(0,10);
-    const filename = `aps_reviews_${stamp}.geojson`;
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
-    URL.revokeObjectURL(url); a.remove();
-
-    const count = features.length;
-    const msg = count ? `Exported ${count} reviews to ${filename}` : 'No reviews to export';
-    showToast(msg);
-  } catch (err) {
-    console.error(err);
-    alert('Export failed. Check console for details.');
-  }
+  });
 }
 
-const exportBtn = document.getElementById('exportGeoJSON');
-if (exportBtn) exportBtn.addEventListener('click', exportGeoJSON);
+async function exportGeoJSON() {
+  let snap;
+  try {
+    // 优先用有序查询
+    snap = await db.collection('reviews').orderBy('createdAt', 'desc').limit(5000).get();
+  } catch (e) {
+    // 若 createdAt 缺失/类型不一致，fallback 到无序
+    console.warn('[export] orderBy(createdAt) failed, fallback to unordered .get():', e);
+    snap = await db.collection('reviews').get();
+  }
+
+  console.log('[export] docs:', snap.size);
+  const features = [];
+  snap.forEach(doc => {
+    const d = doc.data() || {};
+    if (typeof d.lat !== 'number' || typeof d.lng !== 'number') return;
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [d.lng, d.lat] },
+      properties: {
+        id: doc.id,
+        address: d.address || null,
+        facilityType: d.facilityType || null,
+        rating: d.rating || null,
+        tags: Array.isArray(d.tags) ? d.tags : [],
+        comment: d.comment || null,
+        userId: d.userId || null,
+        createdAt: toISO(d.createdAt),
+        updatedAt: toISO(d.updatedAt)
+      }
+    });
+  });
+
+  const fc = { type: 'FeatureCollection', features };
+  const text = JSON.stringify(fc, null, 2);
+  console.log('[export] feature count:', features.length);
+
+  const blob = new Blob([text], { type: 'application/geo+json' });
+  const stamp = new Date().toISOString().slice(0,10);
+  const filename = `aps_reviews_${stamp}.geojson`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  URL.revokeObjectURL(url); a.remove();
+
+  const msg = features.length ? `Exported ${features.length} reviews to ${filename}` : 'No reviews to export';
+  showToast(msg);
+}
