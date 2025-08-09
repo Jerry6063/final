@@ -297,3 +297,58 @@ if (submitBtn) {
     }
   });
 }
+
+/***** Export reviews -> GeoJSON *****/
+function toISO(ts) {
+  try { return ts?.toDate?.().toISOString?.() || null; } catch { return null; }
+}
+
+async function exportGeoJSON() {
+  try {
+    // Pull up to 5000 docs; adjust as needed or paginate
+    const snap = await db.collection('reviews').orderBy('createdAt', 'desc').limit(5000).get();
+
+    const features = [];
+    snap.forEach(doc => {
+      const d = doc.data() || {};
+      if (typeof d.lat !== 'number' || typeof d.lng !== 'number') return;
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [d.lng, d.lat] },
+        properties: {
+          id: doc.id,
+          address: d.address || null,
+          facilityType: d.facilityType || null,
+          rating: d.rating || null,
+          tags: Array.isArray(d.tags) ? d.tags : [],
+          comment: d.comment || null,
+          userId: d.userId || null,
+          createdAt: toISO(d.createdAt),
+          updatedAt: toISO(d.updatedAt)
+        }
+      });
+    });
+
+    const fc = { type: 'FeatureCollection', features };
+    const blob = new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' });
+
+    const stamp = new Date().toISOString().slice(0,10);
+    const filename = `aps_reviews_${stamp}.geojson`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    URL.revokeObjectURL(url); a.remove();
+
+    const count = features.length;
+    const msg = count ? `Exported ${count} reviews to ${filename}` : 'No reviews to export';
+    showToast(msg);
+  } catch (err) {
+    console.error(err);
+    alert('Export failed. Check console for details.');
+  }
+}
+
+const exportBtn = document.getElementById('exportGeoJSON');
+if (exportBtn) exportBtn.addEventListener('click', exportGeoJSON);
